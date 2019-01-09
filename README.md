@@ -1,2 +1,2 @@
 # lru
-LRU algorithm written in golang.
+LRU algorithm written in golang, not thread-safe.
