@@ -9,10 +9,10 @@ type Node struct {
 	// Key key of node
 	Key interface{}
 	// length length of value
-	length int //todo
+	length int64
 	// Value value of node
 	Value interface{}
-	// Extra extra field of node. todo: this field
+	// Extra extra field of node. todo
 	Extra interface{}
 	// AccessTime timestamp of access time
 	AccessTime int64
@@ -29,13 +29,10 @@ type Node struct {
 }
 
 type LRU struct {
-	// maxSize all value max size of lru
-	maxSize int64
-	// curSize current all value size of lru
-	curSize int64
-
-	// ttl time to live(second)
-	ttl int64
+	// MaxSize all value max size of lru(bytes).
+	MaxSize int64
+	// TTL time to live(second)
+	TTL int64
 
 	// deleteNodeCallBack if this field is not nil, when a node is deleted,
 	// from lru linked list and callback this function.For example, in http
@@ -47,7 +44,37 @@ type LRU struct {
 	// 		delete(globalMap, key)
 	// }
 	// lru := NewLRUWithCallback(300, DeleteMetadata)
-	deleteNodeCallBack func(key interface{})
+	DeleteNodeCallBack func(key interface{})
+
+	// EliminateLength eliminate length of lru double linked list,
+	// if this field is nil, we calculate eliminate length with the
+	// length of new node. you can define EliminateLength function
+	// like this:
+	// lru := &LRU{MaxSize: 100, ...}
+	// lru.EliminateLength = func() int64 {
+	// 		// closure with lru.MaxSize
+	// 		return lru.MaxSize/10
+	// }
+	// so when eliminate happened, we release 1/10 of lru.MaxSize
+	// space.
+	EliminateLength func() int64
+
+	// SetValue set node value, if SetValue is nil, store value in memory.
+	// if length of value is big like elephant, we suggest you define
+	// SetValue and store value in disk, for example:
+	// lru := &LRU{...}
+	// lru.SetValue = func(key, value interface) error {
+	// 		fd, _ := os.Open(key.(string))
+	// 		fd.Write(value.([]byte))
+	//		return nil
+	// }
+	SetValue func(key, value interface{}) error
+
+	// GetValue like SetValue, define the function of get value.
+	GetValue func(interface{}) (interface{}, error)
+
+	// curSize current all value size of lru(bytes).
+	curSize int64
 
 	// lru double linked list header and tail pointer.
 	header *Node
@@ -56,24 +83,24 @@ type LRU struct {
 
 // NewLRU return a new LRU instance, set time-to-live of lru node if ttl is greater than 0.
 func NewLRU(maxSize, ttl int64) *LRU {
-	lru := &LRU{maxSize: maxSize}
+	lru := &LRU{MaxSize: maxSize}
 	if ttl > 0 {
-		lru.ttl = ttl
+		lru.TTL = ttl
 	}
 	return lru
 }
 
 // NewLRUWithCallback return a new LRU instance with delete-node-callback.
 func NewLRUWithCallback(ttl int64, callback func(interface{})) *LRU {
-	lru := &LRU{deleteNodeCallBack: callback}
+	lru := &LRU{DeleteNodeCallBack: callback}
 	if ttl > 0 {
-		lru.ttl = ttl
+		lru.TTL = ttl
 	}
 	return lru
 }
 
 // getInterfaceLength get length of interface
-func getInterfaceLength(i interface{}) int {
+func getInterfaceLength(i interface{}) int64 {
 	// todo
 	return 0
 }
@@ -91,8 +118,8 @@ func newNode(key, value interface{}, extra ...interface{}) *Node {
 }
 
 func (lru *LRU) add(node *Node) {
-	if lru.ttl > 0 {
-		node.expire = time.Now().Unix() + lru.ttl
+	if lru.TTL > 0 {
+		node.expire = time.Now().Unix() + lru.TTL
 	}
 
 	if lru.header == nil {
@@ -105,8 +132,21 @@ func (lru *LRU) add(node *Node) {
 	}
 }
 
-func (lru *LRU) NewNode(key, value interface{}, extra ...interface{}) {
+// NewNode return nil if lru.SetValue is nil or lru.SetValue return nil
+func (lru *LRU) NewNode(key, value interface{}, extra ...interface{}) error {
+	diff := lru.curSize + getInterfaceLength(value) - lru.MaxSize
+	if diff > 0 {
+		lru.eliminate(diff)
+	}
+
+	if lru.SetValue != nil {
+		if err := lru.SetValue(key, value); err != nil {
+			return err
+		}
+	}
+
 	lru.add(newNode(key, value, extra...))
+	return nil
 }
 
 // RemoveToHead move node to lru double linked list head
@@ -132,15 +172,22 @@ func (lru *LRU) Get(node *Node) *Node {
 		lru.Delete(node)
 		return nil
 	}
+	if lru.GetValue != nil {
+		var err error
+		node.Value, err = lru.GetValue(node.Key)
+		if err != nil {
+			lru.Delete(node)
+			return nil
+		}
+	}
+
 	lru.moveToHead(node)
 	node.AccessTime = now
 	node.AccessCount++
-
-	//todo: define get node info with interface
 	return node
 }
 
-// todo
+// eliminate eliminate old node
 func (lru *LRU) eliminate(length int64) {
 	for lru.tail != nil && length > 0 {
 		node := lru.tail
@@ -152,15 +199,15 @@ func (lru *LRU) eliminate(length int64) {
 // Delete delete node from lru double linked list,
 // node MUST not nil and is REAL node in lru list.
 func (lru *LRU) Delete(node *Node) {
-	if lru.header == lru.tail {
+	if lru.header != lru.tail {
 		if lru.tail == node {
-			lru.header = node.next
-			lru.header.previous = nil
-			node.next = nil
-		} else if lru.header == node {
 			lru.tail = node.previous
 			lru.tail.next = nil
 			node.previous = nil
+		} else if lru.header == node {
+			lru.header = node.next
+			lru.header.previous = nil
+			node.next = nil
 		} else {
 			node.previous.next = node.next
 			node.next.previous = node.previous
@@ -174,7 +221,7 @@ func (lru *LRU) Delete(node *Node) {
 	}
 
 	// delete node callback
-	if lru.deleteNodeCallBack != nil {
-		lru.deleteNodeCallBack(node.Key)
+	if lru.DeleteNodeCallBack != nil {
+		lru.DeleteNodeCallBack(node.Key)
 	}
 }
