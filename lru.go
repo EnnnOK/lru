@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// todo: circle double linked list maybe better
 // Node lru data node
 type Node struct {
 	// Key key of node
