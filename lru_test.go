@@ -26,8 +26,8 @@ func (lru *LRU) printLRUList(t *testing.T) {
 
 func TestNewNode(t *testing.T) {
 	lru := NewLRU(100, 100)
-	lru.NewNode(123, 234)
-	lru.NewNode(1231, 2342)
+	lru.AddNewNode(123, 234)
+	lru.AddNewNode(1231, 2342)
 	lru.printLRUList(t)
 }
 
@@ -39,6 +39,6 @@ func TestGet(t *testing.T) {
 	lru.add(node2)
 	lru.printLRUList(t)
 	time.Sleep(2 * time.Second)
-	t.Log(lru.Get(node1))
-	t.Log(lru.Get(node2))
+	t.Log(lru.Access(node1))
+	t.Log(lru.Access(node2))
 }

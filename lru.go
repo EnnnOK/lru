@@ -133,7 +133,7 @@ func (lru *LRU) add(node *Node) {
 }
 
 // NewNode return nil if lru.SetValue is nil or lru.SetValue return nil
-func (lru *LRU) NewNode(key, value interface{}, extra ...interface{}) error {
+func (lru *LRU) AddNewNode(key, value interface{}, extra ...interface{}) (*Node, error) {
 	diff := lru.curSize + getInterfaceLength(value) - lru.MaxSize
 	if diff > 0 {
 		lru.eliminate(diff)
@@ -141,12 +141,13 @@ func (lru *LRU) NewNode(key, value interface{}, extra ...interface{}) error {
 
 	if lru.SetValue != nil {
 		if err := lru.SetValue(key, value); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	lru.add(newNode(key, value, extra...))
-	return nil
+	node := newNode(key, value, extra...)
+	lru.add(node)
+	return node, nil
 }
 
 // RemoveToHead move node to lru double linked list head
@@ -166,7 +167,7 @@ func (lru *LRU) moveToHead(node *Node) {
 	}
 }
 
-func (lru *LRU) Get(node *Node) *Node {
+func (lru *LRU) Access(node *Node) *Node {
 	now := time.Now().Unix()
 	if node.expire < now {
 		lru.Delete(node)
