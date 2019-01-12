@@ -1,7 +1,14 @@
 package main
 
-import "github.com/golang/groupcache/lru"
+import (
+	"fmt"
+	"github.com/nuczzz/lru"
+)
 
 func main() {
-	l := lru.New()
+	l := lru.NewLRU(100, 40)
+	node, _ := l.AddNewNode("key", "value")
+	fmt.Printf("%#v\n", node)
+	new := l.Access(node)
+	fmt.Printf("%#v\n", new)
 }
