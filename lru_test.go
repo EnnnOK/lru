@@ -18,7 +18,7 @@ func TestNewLRUWithCallback(t *testing.T) {
 
 func (lru *LRU) printLRUList(t *testing.T) {
 	temp := lru.header
-	for temp != nil {
+	for temp != nil && temp.next != lru.header {
 		t.Logf("%#v", temp)
 		temp = temp.next
 	}
@@ -33,8 +33,8 @@ func TestNewNode(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	lru := NewLRU(100, 1)
-	node1 := newNode(123, 234)
-	node2 := newNode(1231, 2342)
+	node1 := lru.newNode(123, 234)
+	node2 := lru.newNode(1231, 2342)
 	lru.add(node1)
 	lru.add(node2)
 	lru.printLRUList(t)

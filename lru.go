@@ -4,7 +4,6 @@ import (
 	"time"
 )
 
-// todo: circle double linked list maybe better
 // Node lru data node
 type Node struct {
 	// Key key of node
@@ -29,6 +28,7 @@ type Node struct {
 	next     *Node
 }
 
+// LRU manager of lru node with circular double linked list
 type LRU struct {
 	// MaxSize all value max size of lru(bytes).
 	MaxSize int64
@@ -77,9 +77,8 @@ type LRU struct {
 	// curSize current all value size of lru(bytes).
 	curSize int64
 
-	// lru double linked list header and tail pointer.
+	// circular double linked list header.
 	header *Node
-	tail   *Node
 }
 
 // NewLRU return a new LRU instance, set time-to-live of lru node if ttl is greater than 0.
@@ -106,30 +105,38 @@ func getInterfaceLength(i interface{}) int64 {
 	return 0
 }
 
-func newNode(key, value interface{}, extra ...interface{}) *Node {
+func (lru *LRU) newNode(key, value interface{}, extra ...interface{}) *Node {
 	node := &Node{
 		Key:    key,
 		length: getInterfaceLength(value),
 		Value:  value,
+		Extra:  extra,
 	}
-	if len(extra) > 0 {
-		node.Extra = extra[0]
+	if lru.TTL > 0 {
+		node.expire = time.Now().Unix() + lru.TTL
 	}
 	return node
 }
 
 func (lru *LRU) add(node *Node) {
-	if lru.TTL > 0 {
-		node.expire = time.Now().Unix() + lru.TTL
-	}
-
 	if lru.header == nil {
+		node.previous = node
+		node.next = node
 		lru.header = node
-		lru.tail = node
 	} else {
-		node.next = lru.header
-		lru.header.previous = node
-		lru.header = node
+		// just one node
+		if lru.header.next == lru.header {
+			lru.header.previous = node
+			lru.header.next = node
+			node.previous = lru.header
+			node.next = lru.header
+		} else {
+			lru.header.previous.next = node
+			node.previous = lru.header.previous
+			node.next = lru.header
+			lru.header.previous = node
+			lru.header = node
+		}
 	}
 }
 
@@ -146,7 +153,7 @@ func (lru *LRU) AddNewNode(key, value interface{}, extra ...interface{}) (*Node,
 		}
 	}
 
-	node := newNode(key, value, extra...)
+	node := lru.newNode(key, value, extra...)
 	lru.add(node)
 	return node, nil
 }
@@ -154,17 +161,9 @@ func (lru *LRU) AddNewNode(key, value interface{}, extra ...interface{}) (*Node,
 // RemoveToHead move node to lru double linked list head
 func (lru *LRU) moveToHead(node *Node) {
 	if node != lru.header {
-		if node == lru.tail {
-			lru.tail = lru.tail.previous
-			lru.tail.next = nil
-		} else {
-			node.next.previous = node.previous
-			node.previous.next = node.next
-		}
-		node.previous = nil
-		node.next = lru.header
-		lru.header.previous = node
-		lru.header = node
+		node.previous.next = node.next
+		node.next.previous = node.previous
+		lru.add(node)
 	}
 }
 
@@ -191,8 +190,8 @@ func (lru *LRU) Access(node *Node) *Node {
 
 // eliminate eliminate old node
 func (lru *LRU) eliminate(length int64) {
-	for lru.tail != nil && length > 0 {
-		node := lru.tail
+	for lru.header != nil && length > 0 {
+		node := lru.header.previous
 		length -= int64(node.length)
 		lru.Delete(node)
 	}
@@ -200,26 +199,17 @@ func (lru *LRU) eliminate(length int64) {
 
 // Delete delete node from lru double linked list,
 // node MUST not nil and is REAL node in lru list.
+// Remove node reference to avoid escape GC.
 func (lru *LRU) Delete(node *Node) {
-	if lru.header != lru.tail {
-		if lru.tail == node {
-			lru.tail = node.previous
-			lru.tail.next = nil
-			node.previous = nil
-		} else if lru.header == node {
-			lru.header = node.next
-			lru.header.previous = nil
-			node.next = nil
-		} else {
-			node.previous.next = node.next
-			node.next.previous = node.previous
-			node.previous = nil
-			node.next = nil
-		}
-	} else {
-		// just one node in lru double linked list
+	if lru.header.next == lru.header {
+		lru.header.previous = nil
+		lru.header.next = nil
 		lru.header = nil
-		lru.tail = nil
+	} else {
+		node.previous.next = node.next
+		node.next.previous = node.previous
+		node.previous = nil
+		node.next = nil
 	}
 
 	// delete node callback
