@@ -201,6 +201,13 @@ func (lru *LRU) eliminate(length int64) {
 // node MUST not nil and is REAL node in lru list.
 // Remove node reference to avoid escape GC.
 func (lru *LRU) Delete(node *Node) {
+	defer func() {
+		// delete node callback
+		if lru.DeleteNodeCallBack != nil {
+			lru.DeleteNodeCallBack(node.Key)
+		}
+	}()
+
 	if lru.header.next == lru.header {
 		lru.header.previous = nil
 		lru.header.next = nil
@@ -210,10 +217,5 @@ func (lru *LRU) Delete(node *Node) {
 		node.next.previous = node.previous
 		node.previous = nil
 		node.next = nil
-	}
-
-	// delete node callback
-	if lru.DeleteNodeCallBack != nil {
-		lru.DeleteNodeCallBack(node.Key)
 	}
 }
