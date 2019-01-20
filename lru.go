@@ -8,8 +8,8 @@ import (
 type Node struct {
 	// Key key of node
 	Key interface{}
-	// length length of value
-	length int64
+	// Length length of value
+	Length int64
 	// Value value of node
 	Value interface{}
 	// Extra extra field of node. todo
@@ -108,7 +108,7 @@ func getInterfaceLength(i interface{}) int64 {
 func (lru *LRU) newNode(key, value interface{}, extra ...interface{}) *Node {
 	node := &Node{
 		Key:    key,
-		length: getInterfaceLength(value),
+		Length: getInterfaceLength(value),
 		Value:  value,
 		Extra:  extra,
 	}
@@ -192,7 +192,7 @@ func (lru *LRU) Access(node *Node) *Node {
 func (lru *LRU) eliminate(length int64) {
 	for lru.header != nil && length > 0 {
 		node := lru.header.previous
-		length -= int64(node.length)
+		length -= int64(node.Length)
 		lru.Delete(node)
 	}
 }
