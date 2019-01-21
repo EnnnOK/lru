@@ -105,10 +105,12 @@ func NewLRUWithCallback(ttl int64, callback func(interface{})) *LRU {
 
 func (lru *LRU) newNode(key interface{}, value Value, extra ...interface{}) *Node {
 	node := &Node{
-		Key:    key,
-		Length: value.Len(),
-		Value:  value,
-		Extra:  extra,
+		Key:   key,
+		Value: value,
+		Extra: extra,
+	}
+	if value != nil {
+		node.Length = value.Len()
 	}
 	if lru.TTL > 0 {
 		node.expire = time.Now().Unix() + lru.TTL
@@ -140,7 +142,10 @@ func (lru *LRU) add(node *Node) {
 
 // NewNode return nil if lru.SetValue is nil or lru.SetValue return nil
 func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) (*Node, error) {
-	diff := lru.curSize + value.Len() - lru.MaxSize
+	diff := lru.curSize - lru.MaxSize
+	if value != nil {
+		diff += value.Len()
+	}
 	if diff > 0 {
 		lru.eliminate(diff)
 	}
