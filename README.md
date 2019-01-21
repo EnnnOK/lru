@@ -23,7 +23,7 @@ func main() {
 	l := lru.NewLRU(100, 40)
 	node, _ := l.AddNewNode("key", value{"value"})
 	fmt.Printf("%#v\n", node)
-	new := l.Access(node)
-	fmt.Printf("%#v\n", new)
+	newNode, _ := l.Access(node)
+	fmt.Printf("%#v\n", newNode)
 }
 ```
