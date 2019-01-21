@@ -45,11 +45,12 @@ type LRU struct {
 	// just delete data from lru list but not delete metadata in map, we may
 	// get wrong result. So we can write a callback function like:
 	// var globalMap = make(map[interface{}]*Node)
-	// func DeleteMetadata(key interface{}) {
+	// func DeleteMetadata(key interface{}) error {
 	// 		delete(globalMap, key)
+	//		return nil
 	// }
 	// lru := NewLRUWithCallback(300, DeleteMetadata)
-	DeleteNodeCallBack func(key interface{})
+	DeleteNodeCallBack func(key interface{}) error
 
 	// EliminateLength eliminate length of lru double linked list,
 	// if this field is nil, we calculate eliminate length with the
@@ -95,7 +96,7 @@ func NewLRU(maxSize, ttl int64) *LRU {
 }
 
 // NewLRUWithCallback return a new LRU instance with delete-node-callback.
-func NewLRUWithCallback(ttl int64, callback func(interface{})) *LRU {
+func NewLRUWithCallback(ttl int64, callback func(interface{}) error) *LRU {
 	lru := &LRU{DeleteNodeCallBack: callback}
 	if ttl > 0 {
 		lru.TTL = ttl
@@ -130,6 +131,7 @@ func (lru *LRU) add(node *Node) {
 			lru.header.next = node
 			node.previous = lru.header
 			node.next = lru.header
+			lru.header = node
 		} else {
 			lru.header.previous.next = node
 			node.previous = lru.header.previous
@@ -147,10 +149,14 @@ func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) (
 		diff += value.Len()
 	}
 	if diff > 0 {
+		var err error
 		if lru.EliminateLength != nil {
-			lru.eliminate(lru.EliminateLength())
+			err = lru.eliminate(lru.EliminateLength())
 		} else {
-			lru.eliminate(diff)
+			err = lru.eliminate(diff)
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -174,47 +180,44 @@ func (lru *LRU) moveToHead(node *Node) {
 	}
 }
 
-func (lru *LRU) Access(node *Node) *Node {
+func (lru *LRU) Access(node *Node) (*Node, error) {
 	now := time.Now().Unix()
 	if node.expire < now {
-		lru.Delete(node)
-		return nil
+		if err := lru.Delete(node); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 	if lru.GetValue != nil {
 		var err error
 		node.Value, err = lru.GetValue(node.Key)
-		if err != nil {
-			lru.Delete(node)
-			return nil
-		}
+		return nil, err
 	}
 
 	lru.moveToHead(node)
 	node.AccessTime = now
 	node.AccessCount++
-	return node
+	return node, nil
 }
 
 // eliminate eliminate old node
-func (lru *LRU) eliminate(length int64) {
+func (lru *LRU) eliminate(length int64) error {
 	for lru.header != nil && length > 0 {
 		node := lru.header.previous
 		length -= int64(node.Length)
-		lru.Delete(node)
+		if err := lru.Delete(node); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // Delete delete node from lru double linked list,
 // node MUST not nil and is REAL node in lru list.
-// Remove node reference to avoid escape GC.
-func (lru *LRU) Delete(node *Node) {
-	defer func() {
-		// delete node callback
-		if lru.DeleteNodeCallBack != nil {
-			lru.DeleteNodeCallBack(node.Key)
-		}
-	}()
-
+// Remove node reference to avoid escape GC. After
+// removed linked node, DeleteNodeCallBack will be
+// executed.
+func (lru *LRU) Delete(node *Node) error {
 	if lru.header.next == lru.header {
 		lru.header.previous = nil
 		lru.header.next = nil
@@ -225,4 +228,24 @@ func (lru *LRU) Delete(node *Node) {
 		node.previous = nil
 		node.next = nil
 	}
+
+	if lru.DeleteNodeCallBack != nil {
+		// delete node callback
+		return lru.DeleteNodeCallBack(node.Key)
+	}
+	return nil
+}
+
+// Traversal return lru node list
+func (lru *LRU) Traversal() []*Node {
+	var list []*Node
+	node := lru.header
+	for node != nil {
+		list = append(list, node)
+		if node.next == lru.header {
+			break
+		}
+		node = node.next
+	}
+	return list
 }

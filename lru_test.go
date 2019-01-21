@@ -19,24 +19,16 @@ func TestNewLRU(t *testing.T) {
 }
 
 func TestNewLRUWithCallback(t *testing.T) {
-	callback := func(interface{}) {}
+	callback := func(interface{}) error { return nil }
 	lru := NewLRUWithCallback(0, callback)
 	t.Logf("%#v", lru)
-}
-
-func (lru *LRU) printLRUList(t *testing.T) {
-	temp := lru.header
-	for temp != nil && temp.next != lru.header {
-		t.Logf("%#v", temp)
-		temp = temp.next
-	}
 }
 
 func TestNewNode(t *testing.T) {
 	lru := NewLRU(100, 100)
 	lru.AddNewNode(123, value{"234"})
 	lru.AddNewNode(1231, value{"2342"})
-	lru.printLRUList(t)
+	t.Log(lru.Traversal())
 }
 
 func TestGet(t *testing.T) {
@@ -45,8 +37,9 @@ func TestGet(t *testing.T) {
 	node2 := lru.newNode(1231, value{"2342"})
 	lru.add(node1)
 	lru.add(node2)
-	lru.printLRUList(t)
+	t.Logf("%#v", lru.Traversal())
 	time.Sleep(2 * time.Second)
 	t.Log(lru.Access(node1))
 	t.Log(lru.Access(node2))
+	t.Logf("%#v", lru.Traversal())
 }
