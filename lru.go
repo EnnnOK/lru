@@ -140,6 +140,7 @@ func (lru *LRU) add(node *Node) {
 			lru.header = node
 		}
 	}
+	lru.curSize += node.Length
 }
 
 // NewNode return nil if lru.SetValue is nil or lru.SetValue return nil
@@ -206,7 +207,7 @@ func (lru *LRU) Access(node *Node) (*Node, error) {
 func (lru *LRU) eliminate(length int64) error {
 	for lru.header != nil && length > 0 {
 		node := lru.header.previous
-		length -= int64(node.Length)
+		length -= node.Length
 		if err := lru.Delete(node); err != nil {
 			return err
 		}
