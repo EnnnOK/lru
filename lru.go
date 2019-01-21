@@ -81,7 +81,7 @@ type LRU struct {
 	// curSize current all value size of lru(bytes).
 	curSize int64
 
-	// circular double linked list header.
+	// header header of circular double linked list.
 	header *Node
 }
 
