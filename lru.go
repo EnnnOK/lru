@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+type Value interface {
+	Len() int64
+}
+
 // Node lru data node
 type Node struct {
 	// Key key of node
@@ -11,7 +15,7 @@ type Node struct {
 	// Length length of value
 	Length int64
 	// Value value of node
-	Value interface{}
+	Value Value
 	// Extra extra field of node. todo
 	Extra interface{}
 	// AccessTime timestamp of access time
@@ -72,7 +76,7 @@ type LRU struct {
 	SetValue func(key, value interface{}) error
 
 	// GetValue like SetValue, define the function of get value.
-	GetValue func(interface{}) (interface{}, error)
+	GetValue func(interface{}) (Value, error)
 
 	// curSize current all value size of lru(bytes).
 	curSize int64
@@ -99,16 +103,10 @@ func NewLRUWithCallback(ttl int64, callback func(interface{})) *LRU {
 	return lru
 }
 
-// getInterfaceLength get length of interface
-func getInterfaceLength(i interface{}) int64 {
-	// todo
-	return 0
-}
-
-func (lru *LRU) newNode(key, value interface{}, extra ...interface{}) *Node {
+func (lru *LRU) newNode(key interface{}, value Value, extra ...interface{}) *Node {
 	node := &Node{
 		Key:    key,
-		Length: getInterfaceLength(value),
+		Length: value.Len(),
 		Value:  value,
 		Extra:  extra,
 	}
@@ -141,8 +139,8 @@ func (lru *LRU) add(node *Node) {
 }
 
 // NewNode return nil if lru.SetValue is nil or lru.SetValue return nil
-func (lru *LRU) AddNewNode(key, value interface{}, extra ...interface{}) (*Node, error) {
-	diff := lru.curSize + getInterfaceLength(value) - lru.MaxSize
+func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) (*Node, error) {
+	diff := lru.curSize + value.Len() - lru.MaxSize
 	if diff > 0 {
 		lru.eliminate(diff)
 	}
