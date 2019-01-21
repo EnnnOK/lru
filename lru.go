@@ -182,11 +182,13 @@ func (lru *LRU) moveToHead(node *Node) {
 
 func (lru *LRU) Access(node *Node) (*Node, error) {
 	now := time.Now().Unix()
-	if node.expire < now {
-		if err := lru.Delete(node); err != nil {
-			return nil, err
+	if lru.TTL > 0 {
+		if node.expire < now {
+			if err := lru.Delete(node); err != nil {
+				return nil, err
+			}
+			return nil, nil
 		}
-		return nil, nil
 	}
 	if lru.GetValue != nil {
 		var err error
