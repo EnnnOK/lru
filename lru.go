@@ -16,7 +16,7 @@ type Node struct {
 	Length int64
 	// Value value of node
 	Value Value
-	// Extra extra field of node. todo
+	// Extra extra field of node.
 	Extra interface{}
 	// AccessTime timestamp of access time
 	AccessTime int64
@@ -61,7 +61,7 @@ type LRU struct {
 	// 		return lru.MaxSize/10
 	// }
 	// so when eliminate happened, we release 1/10 of lru.MaxSize
-	// space.
+	// space rather than the oldest value's length.
 	EliminateLength func() int64
 
 	// SetValue set node value, if SetValue is nil, store value in memory.
@@ -147,7 +147,11 @@ func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) (
 		diff += value.Len()
 	}
 	if diff > 0 {
-		lru.eliminate(diff)
+		if lru.EliminateLength != nil {
+			lru.eliminate(lru.EliminateLength())
+		} else {
+			lru.eliminate(diff)
+		}
 	}
 
 	if lru.SetValue != nil {
