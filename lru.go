@@ -39,6 +39,9 @@ type LRU struct {
 	// TTL time to live(second)
 	TTL int64
 
+	// AddNodeCallBack callback after lru add node
+	AddNodeCallBack func(node *Node)
+
 	// deleteNodeCallBack if this field is not nil, when a node is deleted,
 	// from lru linked list and callback this function.For example, in http
 	// cache, we often use map+lru-list to cache some static files, if we
@@ -144,7 +147,7 @@ func (lru *LRU) add(node *Node) {
 }
 
 // NewNode return nil if lru.SetValue is nil or lru.SetValue return nil
-func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) (*Node, error) {
+func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) error {
 	diff := lru.curSize - lru.MaxSize
 	if value != nil {
 		diff += value.Len()
@@ -157,19 +160,22 @@ func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) (
 			err = lru.eliminate(diff)
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	if lru.SetValue != nil {
 		if err := lru.SetValue(key, value); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	node := lru.newNode(key, value, extra...)
 	lru.add(node)
-	return node, nil
+	if lru.AddNodeCallBack != nil {
+		lru.AddNodeCallBack(node)
+	}
+	return nil
 }
 
 // RemoveToHead move node to lru double linked list head
@@ -194,7 +200,9 @@ func (lru *LRU) Access(node *Node) (*Node, error) {
 	if lru.GetValue != nil {
 		var err error
 		node.Value, err = lru.GetValue(node.Key)
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	lru.moveToHead(node)
