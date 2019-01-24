@@ -36,8 +36,8 @@ type Node struct {
 type LRU struct {
 	// MaxSize all value max size of lru(bytes).
 	MaxSize int64
-	// CurSize current all value size of lru(bytes).
-	CurSize int64
+	// curSize current all value size of lru(bytes).
+	curSize int64
 	// TTL time to live(second)
 	TTL int64
 
@@ -97,6 +97,10 @@ func NewLRU(maxSize, ttl int64) *LRU {
 	return lru
 }
 
+func (lru *LRU) CurSize() int64 {
+	return lru.curSize
+}
+
 // NewLRUWithCallback return a new LRU instance with delete-node-callback.
 func NewLRUWithCallback(ttl int64, callback func(interface{}) error) *LRU {
 	lru := &LRU{DeleteNodeCallBack: callback}
@@ -142,12 +146,11 @@ func (lru *LRU) add(node *Node) {
 			lru.header = node
 		}
 	}
-	lru.CurSize += node.Length
 }
 
 // NewNode return nil if lru.SetValue is nil or lru.SetValue return nil
 func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) error {
-	diff := lru.CurSize - lru.MaxSize
+	diff := lru.curSize - lru.MaxSize
 	if value != nil {
 		diff += value.Len()
 	}
@@ -174,6 +177,7 @@ func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) e
 	if lru.AddNodeCallBack != nil {
 		lru.AddNodeCallBack(node)
 	}
+	lru.curSize += node.Length
 	return nil
 }
 
