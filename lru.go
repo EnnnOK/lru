@@ -36,6 +36,8 @@ type Node struct {
 type LRU struct {
 	// MaxSize all value max size of lru(bytes).
 	MaxSize int64
+	// CurSize current all value size of lru(bytes).
+	CurSize int64
 	// TTL time to live(second)
 	TTL int64
 
@@ -81,9 +83,6 @@ type LRU struct {
 
 	// GetValue like SetValue, define the function of get value.
 	GetValue func(interface{}) (Value, error)
-
-	// curSize current all value size of lru(bytes).
-	curSize int64
 
 	// header header of circular double linked list.
 	header *Node
@@ -143,12 +142,12 @@ func (lru *LRU) add(node *Node) {
 			lru.header = node
 		}
 	}
-	lru.curSize += node.Length
+	lru.CurSize += node.Length
 }
 
 // NewNode return nil if lru.SetValue is nil or lru.SetValue return nil
 func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) error {
-	diff := lru.curSize - lru.MaxSize
+	diff := lru.CurSize - lru.MaxSize
 	if value != nil {
 		diff += value.Len()
 	}
