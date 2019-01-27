@@ -194,7 +194,7 @@ func (lru *LRU) Access(node *Node) (*Node, error) {
 	now := time.Now().Unix()
 	if lru.TTL > 0 {
 		if node.expire < now {
-			if err := lru.Delete(node); err != nil {
+			if err := lru.delete(node); err != nil {
 				return nil, err
 			}
 			return nil, nil
@@ -219,19 +219,66 @@ func (lru *LRU) eliminate(length int64) error {
 	for lru.header != nil && length > 0 {
 		node := lru.header.previous
 		length -= node.Length
-		if err := lru.Delete(node); err != nil {
+		if err := lru.delete(node); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Delete delete node from lru double linked list,
+func (lru *LRU) replace(node *Node, value Value, extra ...interface{}) error {
+	if value != nil {
+		node.Length = value.Len()
+	} else {
+		node.Length = 0
+	}
+
+	if lru.SetValue != nil {
+		if err := lru.SetValue(node.Key, value); err != nil {
+			return err
+		}
+	} else {
+		node.Value = value
+	}
+
+	node.Extra = extra
+	node.AccessCount = 0
+	node.AccessTime = 0
+	if lru.TTL > 0 {
+		node.expire = time.Now().Unix() + lru.TTL
+	}
+	return nil
+}
+
+func (lru *LRU) Replace(node *Node, value Value, extra ...interface{}) error {
+	lru.moveToHead(node)
+	length := node.Length
+	diff := lru.curSize - node.Length - lru.MaxSize
+	if value != nil {
+		diff += value.Len()
+		length -= value.Len()
+	}
+	if diff > 0 {
+		var err error
+		if lru.EliminateLength != nil {
+			err = lru.eliminate(lru.EliminateLength())
+		} else {
+			err = lru.eliminate(diff)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	lru.curSize -= length
+	return lru.replace(node, value, extra...)
+}
+
+// delete delete node from lru double linked list,
 // node MUST not nil and is REAL node in lru list.
 // Remove node reference to avoid escape GC. After
 // removed linked node, DeleteNodeCallBack will be
 // executed.
-func (lru *LRU) Delete(node *Node) error {
+func (lru *LRU) delete(node *Node) error {
 	if lru.header.next == lru.header {
 		lru.header.previous = nil
 		lru.header.next = nil
