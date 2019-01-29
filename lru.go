@@ -127,7 +127,7 @@ func (lru *LRU) newNode(key interface{}, value Value, extra ...interface{}) *Nod
 	return node
 }
 
-func (lru *LRU) add(node *Node) {
+func (lru *LRU) Add(node *Node) {
 	if lru.header == nil {
 		node.previous = node
 		node.next = node
@@ -175,7 +175,7 @@ func (lru *LRU) AddNewNode(key interface{}, value Value, extra ...interface{}) e
 	}
 
 	node := lru.newNode(key, value, extra...)
-	lru.add(node)
+	lru.Add(node)
 	if lru.AddNodeCallBack != nil {
 		lru.AddNodeCallBack(node)
 	}
@@ -188,7 +188,7 @@ func (lru *LRU) moveToHead(node *Node) {
 	if node != lru.header {
 		node.previous.next = node.next
 		node.next.previous = node.previous
-		lru.add(node)
+		lru.Add(node)
 	}
 }
 
