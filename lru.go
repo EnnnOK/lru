@@ -114,7 +114,9 @@ func (lru *LRU) newNode(key interface{}, value Value, extra ...interface{}) *Nod
 	node := &Node{
 		Key:   key,
 		Value: value,
-		Extra: extra,
+	}
+	if len(extra) > 0 {
+		node.Extra = extra[0]
 	}
 	if value != nil {
 		node.Length = value.Len()
@@ -241,7 +243,9 @@ func (lru *LRU) replace(node *Node, value Value, extra ...interface{}) error {
 		node.Value = value
 	}
 
-	node.Extra = extra
+	if len(extra) > 0 {
+		node.Extra = extra[0]
+	}
 	node.AccessCount = 0
 	node.AccessTime = 0
 	if lru.TTL > 0 {
