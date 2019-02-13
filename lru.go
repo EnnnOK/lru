@@ -196,7 +196,7 @@ func (lru *LRU) Access(node *Node) (*Node, error) {
 	now := time.Now().Unix()
 	if lru.TTL > 0 {
 		if node.expire < now {
-			if err := lru.delete(node); err != nil {
+			if err := lru.Delete(node); err != nil {
 				return nil, err
 			}
 			return nil, nil
@@ -221,7 +221,7 @@ func (lru *LRU) eliminate(length int64) error {
 	for lru.header != nil && length > 0 {
 		node := lru.header.previous
 		length -= node.Length
-		if err := lru.delete(node); err != nil {
+		if err := lru.Delete(node); err != nil {
 			return err
 		}
 	}
@@ -282,7 +282,7 @@ func (lru *LRU) Replace(node *Node, value Value, extra ...interface{}) error {
 // Remove node reference to avoid escape GC. After
 // removed linked node, DeleteNodeCallBack will be
 // executed.
-func (lru *LRU) delete(node *Node) error {
+func (lru *LRU) Delete(node *Node) error {
 	if lru.header.next == lru.header {
 		lru.header.previous = nil
 		lru.header.next = nil
