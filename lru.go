@@ -88,6 +88,10 @@ type LRU struct {
 	header *Node
 }
 
+func (n *Node) SetExpire(expire int64) {
+	n.expire = expire
+}
+
 // NewLRU return a new LRU instance, set time-to-live of lru node if ttl is greater than 0.
 func NewLRU(maxSize, ttl int64) *LRU {
 	lru := &LRU{MaxSize: maxSize}
