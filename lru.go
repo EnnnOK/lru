@@ -288,10 +288,14 @@ func (lru *LRU) Replace(node *Node, value Value, extra ...interface{}) error {
 // executed.
 func (lru *LRU) Delete(node *Node) error {
 	if lru.header.next == lru.header {
+		// just one node
 		lru.header.previous = nil
 		lru.header.next = nil
 		lru.header = nil
 	} else {
+		if lru.header == node {
+			lru.header = node.next
+		}
 		node.previous.next = node.next
 		node.next.previous = node.previous
 		node.previous = nil
